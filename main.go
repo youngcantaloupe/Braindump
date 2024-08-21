@@ -1,72 +1,77 @@
 package main
+import "fmt"
+import "os"
 
-import (
-	"fmt"
-	"log"
-
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-)
-
-func main() { 
-    p := tea.NewProgram(initialModel())
-    if _, err := p.Run(); err != nil {
-        log.Fatal(err)
-    }
-}
-
-type (
-	errMsg error
-)
+import tea "github.com/charmbracelet/bubbletea"
 
 type model struct {
-	textInput textinput.Model
-	err       error
+    choices []string
+    cursor int
+    selected map[int]struct{}
 }
 
 func initialModel() model {
-	ti := textinput.New()
-	ti.Placeholder = "Sample text"
-	ti.Focus()
-	ti.CharLimit = 156
-	ti.Width = 20
-
-	return model{
-		textInput: ti,
-		err:       nil,
-	}
+    return model{
+        choices: []string{"Item 1", "Item 2", "Item 3"},
+        selected: make(map[int]struct{}),
+    }
 }
 
 func (m model) Init() tea.Cmd {
-    return textinput.Blink
+    return nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        switch msg.String() {
+        case "ctrl+c", "q":
+            return m, tea.Quit
+        case "up", "k":
+            if m.cursor > 0 {
+               m.cursor-- 
+            }
+        case "down", "j":
+            if m.cursor < len(m.choices) - 1 {
+                m.cursor++
+            }
+        case "enter", " ":
+            _, ok := m.selected[m.cursor]
+            if ok {
+                delete(m.selected, m.cursor)
+            } else {
+                m.selected[m.cursor] = struct{}{}
+            }
+        }
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-        case tea.KeyCtrlC, tea.KeyEsc:
-			return m, tea.Quit
-        case tea.KeyEnter:
-            fmt.Println(m.textInput.Value())
-            return m, nil
-		}
-
-	case errMsg:
-		m.err = msg
-		return m, nil
-	}
-
-	m.textInput, cmd = m.textInput.Update(msg)
-	return m, cmd
+    }
+    return m, nil
 }
 
 func (m model) View() string {
-	return fmt.Sprintf(
-        "List items:\n\n%s\n\n%s",
-		m.textInput.View(),
-		"(esc to quit)",
-	) + "\n"
+    s := "Item list:\n\n" 
+
+    for i , choice := range m. choices {
+        cursor := " "
+        if m.cursor == i {
+            cursor = ">"
+        }
+
+        checked := " " 
+        if _, ok := m.selected[i]; ok {
+            checked = "x"
+        }
+        
+        s += fmt.Sprintf("%s [%s] %s\n", cursor, checked,choice)
+    }
+    s += "\nPress q to quit.\n"
+    return s
+}
+
+func main() {
+    p := tea.NewProgram(initialModel())
+    if err := p.Start(); err != nil {
+        fmt.Printf("Alas, there's been an error: %v", err)
+        os.Exit(1)
+    }
 }
