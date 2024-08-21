@@ -1,77 +1,81 @@
 package main
-import "fmt"
-import "os"
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"fmt"
+	"os"
 
-type model struct {
-    choices []string
-    cursor int
-    selected map[int]struct{}
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+type status int
+
+const (
+    todo status = iota
+    inProgress
+    done
+)
+
+type Task struct {
+    status status
+    title string
+    description string
 }
 
-func initialModel() model {
-    return model{
-        choices: []string{"Item 1", "Item 2", "Item 3"},
-        selected: make(map[int]struct{}),
-    }
+func (t Task) FilterValue() string {
+    return t.title
 }
 
-func (m model) Init() tea.Cmd {
+func (t Task) Title() string {
+    return t.title
+}
+
+func (t Task) Description() string {
+    return t.description
+}
+
+type Model struct {
+    list list.Model
+    err error
+}
+
+func New() *Model {
+    return &Model{}
+}
+
+func (m *Model) initList(width, height int) {
+    m.list = list.New([]list.Item{}, list.NewDefaultDelegate(), width, height)
+    m.list.Title = "To Do"
+    m.list.SetItems([]list.Item{
+        Task{status: todo, title: "Item 1", description: "todo item number 1"},
+        Task{status: todo, title: "Item 2", description: "todo item number 2"},
+        Task{status: todo, title: "Item 3", description: "todo item number 3"},
+    })
+}
+
+func (m Model) Init() tea.Cmd {
     return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
-    case tea.KeyMsg:
-        switch msg.String() {
-        case "ctrl+c", "q":
-            return m, tea.Quit
-        case "up", "k":
-            if m.cursor > 0 {
-               m.cursor-- 
-            }
-        case "down", "j":
-            if m.cursor < len(m.choices) - 1 {
-                m.cursor++
-            }
-        case "enter", " ":
-            _, ok := m.selected[m.cursor]
-            if ok {
-                delete(m.selected, m.cursor)
-            } else {
-                m.selected[m.cursor] = struct{}{}
-            }
-        }
-
+    case tea.WindowSizeMsg:
+        m.initList(msg.Width, msg.Height)
     }
-    return m, nil
+    var cmd tea.Cmd
+    m.list, cmd = m.list.Update(msg)
+    return m, cmd
 }
 
-func (m model) View() string {
-    s := "Item list:\n\n" 
-
-    for i , choice := range m. choices {
-        cursor := " "
-        if m.cursor == i {
-            cursor = ">"
-        }
-
-        checked := " " 
-        if _, ok := m.selected[i]; ok {
-            checked = "x"
-        }
-        
-        s += fmt.Sprintf("%s [%s] %s\n", cursor, checked,choice)
-    }
-    s += "\nPress q to quit.\n"
-    return s
+func (m Model) View() string {
+    return m.list.View()
 }
 
 func main() {
-    p := tea.NewProgram(initialModel())
-    if err := p.Run(); err != nil {
-        fmt.Printf("Alas, there's been an error: %v", err)
+    m := New()
+    p := tea.NewProgram(m)
+    if _, err := p.Run(); err != nil {
+        fmt.Println()
         os.Exit(1)
     }
 }
